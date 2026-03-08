@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
-import { io } from "socket.io-client";
-import { app } from "./firebase";
 import { Location, Staff, Task, TaskStatus } from "./types";
+import { subscribeToLocations, subscribeToStaff, subscribeToTasks, addStaff, updateStaff, deleteStaff, addTask, updateTask, deleteTask, seedInitialData, cleanupDuplicates } from "./services/db";
 import {
   Building2,
   Users,
@@ -19,103 +18,60 @@ import {
   ChevronLeft,
   ChevronRight,
   Calendar,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
-
-const socket = io();
 
 export default function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [staff, setStaff] = useState<Staff[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
 
-  const [selectedLocation, setSelectedLocation] = useState<number | null>(null);
-  const [selectedStaff, setSelectedStaff] = useState<number | null>(null);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [selectedStaff, setSelectedStaff] = useState<string | null>(null);
   const [view, setView] = useState<'tasks' | 'staff' | 'dashboard'>('dashboard');
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isOnline, setIsOnline] = useState(navigator.onLine && socket.connected);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   useEffect(() => {
-    const handleOnline = () => setIsOnline(socket.connected);
+    const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
-    
-    const handleSocketConnect = () => setIsOnline(navigator.onLine);
-    const handleSocketDisconnect = () => setIsOnline(false);
 
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
-    socket.on('connect', handleSocketConnect);
-    socket.on('disconnect', handleSocketDisconnect);
 
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
-      socket.off('connect', handleSocketConnect);
-      socket.off('disconnect', handleSocketDisconnect);
     };
   }, []);
 
   useEffect(() => {
-    // Fetch initial data
-    fetch("/api/locations")
-      .then((res) => res.json())
-      .then(setLocations);
-    fetch("/api/staff")
-      .then((res) => res.json())
-      .then(setStaff);
-    fetch("/api/tasks")
-      .then((res) => res.json())
-      .then(setTasks);
-
-    // Socket listeners
-    socket.on("taskAdded", (newTask: Task) => {
-      setTasks((prev) => [...prev, newTask]);
+    // Clean up duplicates first, then seed initial data if needed
+    cleanupDuplicates().then(() => {
+      seedInitialData();
     });
 
-    socket.on("taskUpdated", (updatedTask: Task) => {
-      setTasks((prev) =>
-        prev.map((t) => (t.id === updatedTask.id ? updatedTask : t)),
-      );
-    });
-
-    socket.on("taskDeleted", (deletedId: number) => {
-      setTasks((prev) => prev.filter((t) => t.id !== deletedId));
-    });
-
-    socket.on("staffAdded", (newStaff: Staff) => {
-      setStaff((prev) => [...prev, newStaff]);
-    });
-
-    socket.on("staffUpdated", (updatedStaff: Staff) => {
-      setStaff((prev) =>
-        prev.map((s) => (s.id === updatedStaff.id ? updatedStaff : s)),
-      );
-    });
-
-    socket.on("staffDeleted", (deletedId: number) => {
-      setStaff((prev) => prev.filter((s) => s.id !== deletedId));
-      setTasks((prev) => prev.filter((t) => t.staff_id !== deletedId));
-      setSelectedStaff((prev) => prev === deletedId ? null : prev);
-    });
+    // Subscribe to Firestore collections
+    const unsubscribeLocations = subscribeToLocations(setLocations);
+    const unsubscribeStaff = subscribeToStaff(setStaff);
+    const unsubscribeTasks = subscribeToTasks(setTasks);
 
     return () => {
-      socket.off("taskAdded");
-      socket.off("taskUpdated");
-      socket.off("taskDeleted");
-      socket.off("staffAdded");
-      socket.off("staffUpdated");
-      socket.off("staffDeleted");
+      unsubscribeLocations();
+      unsubscribeStaff();
+      unsubscribeTasks();
     };
   }, []);
 
-  const handleLocationClick = (locId: number) => {
+  const handleLocationClick = (locId: string) => {
     setSelectedLocation(selectedLocation === locId ? null : locId);
     setSelectedStaff(null);
     setView('tasks');
   };
 
-  const handleStaffClick = (staffId: number) => {
+  const handleStaffClick = (staffId: string) => {
     setSelectedStaff(staffId);
     setView('tasks');
     setIsSidebarOpen(false); // Close sidebar on mobile after selection
@@ -448,7 +404,9 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
               {/* Body: Staff and Tasks */}
               <div className="flex flex-col">
                 {locations.map(location => {
-                  const locationStaff = staff.filter(s => s.location_id === location.id);
+                  const locationStaff = staff
+                    .filter(s => s.location_id === location.id)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0));
                   if (locationStaff.length === 0) return null;
 
                   return (
@@ -471,7 +429,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
                           
                           const sortedTasks = [...staffTasks].sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
                           const tracks: number[] = [];
-                          const taskTracks = new Map<number, number>();
+                          const taskTracks = new Map<string, number>();
                           
                           sortedTasks.forEach(task => {
                             const start = new Date(task.start_date);
@@ -648,14 +606,14 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
 function StaffManagement({ locations, staff }: { locations: Location[], staff: Staff[] }) {
   const [newStaffName, setNewStaffName] = useState("");
   const [newStaffRole, setNewStaffRole] = useState("");
-  const [newStaffLocation, setNewStaffLocation] = useState<number>(locations[0]?.id || 0);
+  const [newStaffLocation, setNewStaffLocation] = useState<string>(locations[0]?.id || "");
   
-  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState("");
   const [editRole, setEditRole] = useState("");
-  const [editLocation, setEditLocation] = useState<number>(0);
+  const [editLocation, setEditLocation] = useState<string>("");
   
-  const [staffToDelete, setStaffToDelete] = useState<number | null>(null);
+  const [staffToDelete, setStaffToDelete] = useState<string | null>(null);
 
   // Update default location when locations load
   useEffect(() => {
@@ -664,18 +622,45 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
     }
   }, [locations, newStaffLocation]);
 
-  const handleAddStaff = (e: React.FormEvent) => {
+  const handleAddStaff = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newStaffName.trim() || !newStaffRole.trim() || !newStaffLocation) return;
     
-    socket.emit("addStaff", {
+    const locationStaff = staff.filter(s => s.location_id === newStaffLocation);
+    const maxOrder = locationStaff.reduce((max, s) => Math.max(max, s.order || 0), 0);
+
+    await addStaff({
       location_id: newStaffLocation,
       name: newStaffName,
-      role: newStaffRole
+      role: newStaffRole,
+      order: maxOrder + 1
     });
     
     setNewStaffName("");
     setNewStaffRole("");
+  };
+
+  const handleMoveStaff = async (locId: string, index: number, direction: 'up' | 'down') => {
+    const locationStaff = staff
+      .filter(s => s.location_id === locId)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+    const newStaffList = [...locationStaff];
+    if (direction === 'up' && index > 0) {
+      const temp = newStaffList[index];
+      newStaffList[index] = newStaffList[index - 1];
+      newStaffList[index - 1] = temp;
+    } else if (direction === 'down' && index < newStaffList.length - 1) {
+      const temp = newStaffList[index];
+      newStaffList[index] = newStaffList[index + 1];
+      newStaffList[index + 1] = temp;
+    } else {
+      return;
+    }
+
+    // Update all orders for this location to ensure consistency
+    const promises = newStaffList.map((s, i) => updateStaff(s.id, { order: i + 1 }));
+    await Promise.all(promises);
   };
 
   const startEdit = (s: Staff) => {
@@ -685,10 +670,9 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
     setEditLocation(s.location_id);
   };
 
-  const saveEdit = () => {
+  const saveEdit = async () => {
     if (!editName.trim() || !editRole.trim() || !editLocation || !editingId) return;
-    socket.emit("updateStaff", {
-      id: editingId,
+    await updateStaff(editingId, {
       location_id: editLocation,
       name: editName,
       role: editRole
@@ -696,13 +680,13 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
     setEditingId(null);
   };
 
-  const deleteStaff = (id: number) => {
+  const handleDeleteStaff = (id: string) => {
     setStaffToDelete(id);
   };
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (staffToDelete !== null) {
-      socket.emit("deleteStaff", staffToDelete);
+      await deleteStaff(staffToDelete);
       setStaffToDelete(null);
     }
   };
@@ -725,10 +709,10 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
             <label className="text-xs font-medium text-slate-500 uppercase tracking-wider">지점</label>
             <select 
               value={newStaffLocation} 
-              onChange={e => setNewStaffLocation(Number(e.target.value))}
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              onChange={e => setNewStaffLocation(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
             >
-              <option value={0} disabled>지점 선택</option>
+              <option value="" disabled>지점 선택</option>
               {locations.map(loc => (
                 <option key={loc.id} value={loc.id}>{loc.name}</option>
               ))}
@@ -781,69 +765,102 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
                   <td colSpan={4} className="px-4 py-8 text-center text-slate-400">등록된 직원이 없습니다.</td>
                 </tr>
               ) : (
-                staff.map(s => (
-                  <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
-                    {editingId === s.id ? (
-                      <>
-                        <td className="px-4 py-2">
-                          <select 
-                            value={editLocation} 
-                            onChange={e => setEditLocation(Number(e.target.value))}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
-                          >
-                            {locations.map(loc => (
-                              <option key={loc.id} value={loc.id}>{loc.name}</option>
-                            ))}
-                          </select>
+                locations.map(loc => {
+                  const locStaff = staff
+                    .filter(s => s.location_id === loc.id)
+                    .sort((a, b) => (a.order || 0) - (b.order || 0));
+                  
+                  if (locStaff.length === 0) return null;
+
+                  return (
+                    <React.Fragment key={loc.id}>
+                      <tr className="bg-slate-50/80">
+                        <td colSpan={4} className="px-4 py-2 font-semibold text-slate-700 text-xs uppercase tracking-wider">
+                          {loc.name}
                         </td>
-                        <td className="px-4 py-2">
-                          <input 
-                            type="text" 
-                            value={editName}
-                            onChange={e => setEditName(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
-                          />
-                        </td>
-                        <td className="px-4 py-2">
-                          <input 
-                            type="text" 
-                            value={editRole}
-                            onChange={e => setEditRole(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
-                          />
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          <div className="flex justify-end gap-2">
-                            <button onClick={saveEdit} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="저장">
-                              <Save size={16} />
-                            </button>
-                            <button onClick={() => setEditingId(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded transition-colors" title="취소">
-                              <X size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-4 py-3 text-slate-600">
-                          {locations.find(l => l.id === s.location_id)?.name}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{s.name}</td>
-                        <td className="px-4 py-3 text-slate-600">{s.role}</td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => startEdit(s)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="수정">
-                              <Edit2 size={16} />
-                            </button>
-                            <button onClick={() => deleteStaff(s.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="삭제">
-                              <Trash2 size={16} />
-                            </button>
-                          </div>
-                        </td>
-                      </>
-                    )}
-                  </tr>
-                ))
+                      </tr>
+                      {locStaff.map((s, index) => (
+                        <tr key={s.id} className="hover:bg-slate-50/50 transition-colors group">
+                          {editingId === s.id ? (
+                            <>
+                              <td className="px-4 py-2">
+                                <select 
+                                  value={editLocation} 
+                                  onChange={e => setEditLocation(e.target.value)}
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
+                                >
+                                  {locations.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={editName}
+                                  onChange={e => setEditName(e.target.value)}
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
+                                />
+                              </td>
+                              <td className="px-4 py-2">
+                                <input 
+                                  type="text" 
+                                  value={editRole}
+                                  onChange={e => setEditRole(e.target.value)}
+                                  className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
+                                />
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                <div className="flex justify-end gap-2">
+                                  <button onClick={saveEdit} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="저장">
+                                    <Save size={16} />
+                                  </button>
+                                  <button onClick={() => setEditingId(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded transition-colors" title="취소">
+                                    <X size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td className="px-4 py-3 text-slate-600">
+                                {loc.name}
+                              </td>
+                              <td className="px-4 py-3 font-medium text-slate-900">{s.name}</td>
+                              <td className="px-4 py-3 text-slate-600">{s.role}</td>
+                              <td className="px-4 py-3 text-right">
+                                <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button 
+                                    onClick={() => handleMoveStaff(loc.id, index, 'up')} 
+                                    disabled={index === 0} 
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400" 
+                                    title="위로 이동"
+                                  >
+                                    <ArrowUp size={16} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleMoveStaff(loc.id, index, 'down')} 
+                                    disabled={index === locStaff.length - 1} 
+                                    className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:text-slate-400" 
+                                    title="아래로 이동"
+                                  >
+                                    <ArrowDown size={16} />
+                                  </button>
+                                  <button onClick={() => startEdit(s)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="수정">
+                                    <Edit2 size={16} />
+                                  </button>
+                                  <button onClick={() => handleDeleteStaff(s.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="삭제">
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -887,18 +904,18 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
   );
 }
 
-function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
+function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: string }) {
   const [newTaskName, setNewTaskName] = useState("");
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [newTaskStartDate, setNewTaskStartDate] = useState("");
   const [newTaskEndDate, setNewTaskEndDate] = useState("");
   const [newTaskContent, setNewTaskContent] = useState("");
 
-  const handleAddTask = (e: React.FormEvent) => {
+  const handleAddTask = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTaskName.trim()) return;
 
-    socket.emit("addTask", {
+    await addTask({
       staff_id: staffId,
       name: newTaskName,
       title: newTaskTitle,
@@ -915,19 +932,20 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
     setNewTaskContent("");
   };
 
-  const updateTaskStatus = (
-    id: number,
+  const updateTaskStatus = async (
+    id: string,
+    name: string,
     status: TaskStatus,
     title: string,
     start_date: string,
     end_date: string,
     content: string,
   ) => {
-    socket.emit("updateTask", { id, status, title, start_date, end_date, content });
+    await updateTask(id, { name, status, title, start_date, end_date, content });
   };
 
-  const deleteTask = (id: number) => {
-    socket.emit("deleteTask", id);
+  const handleDeleteTask = async (id: string) => {
+    await deleteTask(id);
   };
 
   const getStatusIcon = (status: TaskStatus) => {
@@ -1030,10 +1048,10 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
             <TaskItem
               key={task.id}
               task={task}
-              onUpdate={(status, title, start_date, end_date, content) =>
-                updateTaskStatus(task.id, status, title, start_date, end_date, content)
+              onUpdate={(name, status, title, start_date, end_date, content) =>
+                updateTaskStatus(task.id, name, status, title, start_date, end_date, content)
               }
-              onDelete={() => deleteTask(task.id)}
+              onDelete={() => handleDeleteTask(task.id)}
               getStatusIcon={getStatusIcon}
             />
           ))
@@ -1051,10 +1069,12 @@ function TaskItem({
 }: {
   key?: React.Key;
   task: Task;
-  onUpdate: (status: TaskStatus, title: string, start_date: string, end_date: string, content: string) => void;
+  onUpdate: (name: string, status: TaskStatus, title: string, start_date: string, end_date: string, content: string) => void;
   onDelete: () => void;
   getStatusIcon: (status: TaskStatus) => React.ReactNode;
 }) {
+  const [isEditing, setIsEditing] = useState(false);
+  const [localName, setLocalName] = useState(task.name || "");
   const [localTitle, setLocalTitle] = useState(task.title || "");
   const [localStartDate, setLocalStartDate] = useState(task.start_date || "");
   const [localEndDate, setLocalEndDate] = useState(task.end_date || "");
@@ -1062,21 +1082,33 @@ function TaskItem({
 
   // Sync local state if task updates from server
   useEffect(() => {
+    setLocalName(task.name || "");
     setLocalTitle(task.title || "");
     setLocalStartDate(task.start_date || "");
     setLocalEndDate(task.end_date || "");
     setLocalContent(task.content || "");
-  }, [task.title, task.start_date, task.end_date, task.content]);
+  }, [task.name, task.title, task.start_date, task.end_date, task.content]);
 
-  const handleBlur = () => {
+  const handleSave = () => {
     if (
+      localName !== task.name ||
       localTitle !== task.title ||
       localStartDate !== task.start_date ||
       localEndDate !== task.end_date ||
       localContent !== task.content
     ) {
-      onUpdate(task.status, localTitle, localStartDate, localEndDate, localContent);
+      onUpdate(localName, task.status, localTitle, localStartDate, localEndDate, localContent);
     }
+    setIsEditing(false);
+  };
+
+  const handleCancel = () => {
+    setLocalName(task.name || "");
+    setLocalTitle(task.title || "");
+    setLocalStartDate(task.start_date || "");
+    setLocalEndDate(task.end_date || "");
+    setLocalContent(task.content || "");
+    setIsEditing(false);
   };
 
   return (
@@ -1090,7 +1122,7 @@ function TaskItem({
               type="radio" 
               name={`status-${task.id}`} 
               checked={task.status === 'Pending'}
-              onChange={() => onUpdate('Pending', localTitle, localStartDate, localEndDate, localContent)}
+              onChange={() => onUpdate(localName, 'Pending', localTitle, localStartDate, localEndDate, localContent)}
               className="w-3.5 h-3.5 text-slate-600 cursor-pointer"
             />
             <span className={`text-xs font-medium ${task.status === 'Pending' ? 'text-slate-900' : 'text-slate-400 group-hover:text-slate-600'}`}>예정</span>
@@ -1100,7 +1132,7 @@ function TaskItem({
               type="radio" 
               name={`status-${task.id}`} 
               checked={task.status === 'In Progress'}
-              onChange={() => onUpdate('In Progress', localTitle, localStartDate, localEndDate, localContent)}
+              onChange={() => onUpdate(localName, 'In Progress', localTitle, localStartDate, localEndDate, localContent)}
               className="w-3.5 h-3.5 text-amber-500 cursor-pointer"
             />
             <span className={`text-xs font-medium ${task.status === 'In Progress' ? 'text-amber-600' : 'text-slate-400 group-hover:text-slate-600'}`}>진행</span>
@@ -1110,7 +1142,7 @@ function TaskItem({
               type="radio" 
               name={`status-${task.id}`} 
               checked={task.status === 'Completed'}
-              onChange={() => onUpdate('Completed', localTitle, localStartDate, localEndDate, localContent)}
+              onChange={() => onUpdate(localName, 'Completed', localTitle, localStartDate, localEndDate, localContent)}
               className="w-3.5 h-3.5 text-emerald-500 cursor-pointer"
             />
             <span className={`text-xs font-medium ${task.status === 'Completed' ? 'text-emerald-600' : 'text-slate-400 group-hover:text-slate-600'}`}>종료</span>
@@ -1119,11 +1151,21 @@ function TaskItem({
 
         <div className="flex-1 space-y-3">
           <div className="flex items-center gap-2">
-            <span
-              className={`text-sm font-medium ${task.status === "Completed" ? "text-slate-500 line-through" : "text-slate-900"}`}
-            >
-              {task.name}
-            </span>
+            {isEditing ? (
+              <input
+                type="text"
+                value={localName}
+                onChange={(e) => setLocalName(e.target.value)}
+                className={`text-sm font-medium bg-transparent border border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-0.5 transition-colors ${task.status === "Completed" ? "text-slate-500 line-through" : "text-slate-900"}`}
+                autoFocus
+              />
+            ) : (
+              <span
+                className={`text-sm font-medium px-1 py-0.5 ${task.status === "Completed" ? "text-slate-500 line-through" : "text-slate-900"}`}
+              >
+                {task.name}
+              </span>
+            )}
             <span
               className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
                 task.status === "Completed"
@@ -1142,51 +1184,101 @@ function TaskItem({
           </div>
 
           <div className="flex flex-col md:flex-row gap-2">
-            <input
-              type="text"
-              value={localTitle}
-              onChange={(e) => setLocalTitle(e.target.value)}
-              onBlur={handleBlur}
-              placeholder="제목 입력..."
-              className={`flex-1 text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors ${task.status === "Completed" ? "text-slate-400" : "text-slate-700 font-medium"}`}
-            />
+            {isEditing ? (
+              <input
+                id={`task-title-${task.id}`}
+                type="text"
+                value={localTitle}
+                onChange={(e) => setLocalTitle(e.target.value)}
+                placeholder="제목 입력..."
+                className={`flex-1 text-sm bg-transparent border border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors ${task.status === "Completed" ? "text-slate-400" : "text-slate-700 font-medium"}`}
+              />
+            ) : (
+              <div className={`flex-1 text-sm px-2 py-1 ${task.status === "Completed" ? "text-slate-400" : "text-slate-700 font-medium"}`}>
+                {task.title || <span className="text-slate-400 italic">제목 없음</span>}
+              </div>
+            )}
             <div className="flex items-center gap-1 text-sm text-slate-500">
-              <input
-                type="date"
-                value={localStartDate}
-                onChange={(e) => setLocalStartDate(e.target.value)}
-                onBlur={handleBlur}
-                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
-              />
-              <span>~</span>
-              <input
-                type="date"
-                value={localEndDate}
-                onChange={(e) => setLocalEndDate(e.target.value)}
-                onBlur={handleBlur}
-                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
-              />
+              {isEditing ? (
+                <>
+                  <input
+                    type="date"
+                    value={localStartDate}
+                    onChange={(e) => setLocalStartDate(e.target.value)}
+                    className="bg-transparent border border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
+                  />
+                  <span>~</span>
+                  <input
+                    type="date"
+                    value={localEndDate}
+                    onChange={(e) => setLocalEndDate(e.target.value)}
+                    className="bg-transparent border border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
+                  />
+                </>
+              ) : (
+                <div className="px-1 py-1">
+                  {task.start_date || '미정'} ~ {task.end_date || '미정'}
+                </div>
+              )}
             </div>
           </div>
 
-          <textarea
-            value={localContent}
-            onChange={(e) => setLocalContent(e.target.value)}
-            onBlur={handleBlur}
-            placeholder="업무 내용 (무제한 입력 가능)..."
-            className={`w-full text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors min-h-[60px] resize-y ${task.status === "Completed" ? "text-slate-400" : "text-slate-600"}`}
-          />
+          {isEditing ? (
+            <textarea
+              value={localContent}
+              onChange={(e) => setLocalContent(e.target.value)}
+              placeholder="업무 내용 (무제한 입력 가능)..."
+              className={`w-full text-sm bg-transparent border border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors min-h-[60px] resize-y ${task.status === "Completed" ? "text-slate-400" : "text-slate-600"}`}
+            />
+          ) : (
+            <div className={`w-full text-sm px-2 py-1 whitespace-pre-wrap ${task.status === "Completed" ? "text-slate-400" : "text-slate-600"}`}>
+              {task.content || <span className="text-slate-400 italic">입력된 내용이 없습니다.</span>}
+            </div>
+          )}
         </div>
       </div>
 
-      <div className="flex items-start justify-end md:opacity-0 group-hover:opacity-100 transition-opacity">
-        <button
-          onClick={onDelete}
-          className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
-          title="삭제"
-        >
-          <Trash2 size={16} />
-        </button>
+      <div className={`flex items-start justify-end gap-1 transition-opacity ${isEditing ? 'opacity-100' : 'md:opacity-0 group-hover:opacity-100'}`}>
+        {isEditing ? (
+          <>
+            <button
+              onClick={handleSave}
+              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="저장"
+            >
+              <Save size={16} />
+            </button>
+            <button
+              onClick={handleCancel}
+              className="p-2 text-slate-400 hover:bg-slate-100 rounded-lg transition-colors"
+              title="취소"
+            >
+              <X size={16} />
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              onClick={() => {
+                setIsEditing(true);
+                setTimeout(() => {
+                  document.getElementById(`task-title-${task.id}`)?.focus();
+                }, 0);
+              }}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="수정"
+            >
+              <Edit2 size={16} />
+            </button>
+            <button
+              onClick={onDelete}
+              className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+              title="삭제"
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

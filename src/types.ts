@@ -1,20 +1,21 @@
 export interface Location {
-  id: number;
+  id: string;
   name: string;
 }
 
 export interface Staff {
-  id: number;
-  location_id: number;
+  id: string;
+  location_id: string;
   name: string;
   role: string;
+  order?: number;
 }
 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
 
 export interface Task {
-  id: number;
-  staff_id: number;
+  id: string;
+  staff_id: string;
   name: string;
   title?: string;
   start_date?: string;
