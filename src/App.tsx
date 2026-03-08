@@ -149,7 +149,7 @@ export default function App() {
         <div className="p-6 border-b border-slate-100 mt-10 md:mt-0">
           <div className="flex items-center justify-between mb-2">
             <h1 className="text-xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-              <Building2 className="text-indigo-600" size={24} />
+              <Building2 className="text-red-600" size={24} />
               시네마 워크플로우
             </h1>
           </div>
@@ -169,9 +169,9 @@ export default function App() {
               setSelectedStaff(null);
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors mb-2 ${view === 'dashboard' ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100"}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors mb-2 ${view === 'dashboard' ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-slate-100"}`}
           >
-            <BarChart3 size={16} className={view === 'dashboard' ? "text-indigo-600" : "text-slate-400"} />
+            <BarChart3 size={16} className={view === 'dashboard' ? "text-red-600" : "text-slate-400"} />
             전체 대시보드
           </button>
           
@@ -181,9 +181,9 @@ export default function App() {
               setSelectedStaff(null);
               setIsSidebarOpen(false);
             }}
-            className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors mb-4 ${view === 'staff' ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100"}`}
+            className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors mb-4 ${view === 'staff' ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-slate-100"}`}
           >
-            <UserPlus size={16} className={view === 'staff' ? "text-indigo-600" : "text-slate-400"} />
+            <UserPlus size={16} className={view === 'staff' ? "text-red-600" : "text-slate-400"} />
             직원 관리
           </button>
           
@@ -192,14 +192,14 @@ export default function App() {
             <div key={loc.id} className="space-y-1">
               <button
                 onClick={() => handleLocationClick(loc.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${selectedLocation === loc.id ? "bg-indigo-50 text-indigo-700" : "text-slate-700 hover:bg-slate-100"}`}
+                className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-lg transition-colors ${selectedLocation === loc.id ? "bg-red-50 text-red-700" : "text-slate-700 hover:bg-slate-100"}`}
               >
                 <span className="flex items-center gap-2">
                   <Building2
                     size={16}
                     className={
                       selectedLocation === loc.id
-                        ? "text-indigo-600"
+                        ? "text-red-600"
                         : "text-slate-400"
                     }
                   />
@@ -215,20 +215,20 @@ export default function App() {
                       <button
                         key={s.id}
                         onClick={() => handleStaffClick(s.id)}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${selectedStaff === s.id ? "bg-slate-900 text-white" : "text-slate-600 hover:bg-slate-100"}`}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm rounded-md transition-colors ${selectedStaff === s.id ? "bg-red-600 text-white" : "text-slate-600 hover:bg-slate-100"}`}
                       >
                         <Users
                           size={14}
                           className={
                             selectedStaff === s.id
-                              ? "text-slate-300"
+                              ? "text-red-200"
                               : "text-slate-400"
                           }
                         />
                         <div className="flex flex-col items-start">
                           <span>{s.name}</span>
                           <span
-                            className={`text-[10px] ${selectedStaff === s.id ? "text-slate-400" : "text-slate-500"}`}
+                            className={`text-[10px] ${selectedStaff === s.id ? "text-red-200" : "text-slate-500"}`}
                           >
                             {s.role}
                           </span>
@@ -388,7 +388,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
               <ChevronLeft size={18} />
             </button>
             <div className="flex items-center gap-2 px-2 font-medium text-slate-700 min-w-[110px] justify-center">
-              <Calendar size={16} className="text-indigo-600" />
+              <Calendar size={16} className="text-red-600" />
               {year}년 {month + 1}월
             </div>
             <button onClick={nextMonth} className="p-1.5 hover:bg-slate-100 rounded-md text-slate-600 transition-colors" title="다음 달">
@@ -420,8 +420,8 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
                     let textClass = 'text-slate-500';
                     
                     if (isToday) {
-                      bgClass = 'bg-indigo-50';
-                      textClass = 'text-indigo-700 font-bold';
+                      bgClass = 'bg-red-50';
+                      textClass = 'text-red-700 font-bold';
                     } else if (isSunday) {
                       bgClass = 'bg-red-50/50';
                       textClass = 'text-red-500';
@@ -436,7 +436,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
                         className={`w-12 flex-shrink-0 text-center py-2 text-xs border-r border-slate-100 ${bgClass} ${textClass}`}
                       >
                         <div>{d.getMonth() + 1}/{d.getDate()}</div>
-                        <div className={isToday ? 'text-indigo-500' : isSunday ? 'text-red-400' : isSaturday ? 'text-blue-400' : 'text-slate-400'}>
+                        <div className={isToday ? 'text-red-500' : isSunday ? 'text-red-400' : isSaturday ? 'text-blue-400' : 'text-slate-400'}>
                           {['일', '월', '화', '수', '목', '금', '토'][d.getDay()]}
                         </div>
                       </div>
@@ -517,7 +517,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
                                 const isSunday = d.getDay() === 0;
                                 
                                 let bgClass = '';
-                                if (isToday) bgClass = 'bg-indigo-50/30';
+                                if (isToday) bgClass = 'bg-red-50/30';
                                 else if (isSunday) bgClass = 'bg-red-50/20';
                                 else if (isSaturday) bgClass = 'bg-blue-50/20';
 
@@ -542,7 +542,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
                                       className={`absolute h-6 rounded-md text-xs px-2.5 flex items-center overflow-hidden whitespace-nowrap shadow-sm border cursor-pointer hover:opacity-80 transition-opacity font-medium ${
                                         task.status === 'Completed' ? 'bg-emerald-100 border-emerald-200 text-emerald-800' :
                                         task.status === 'In Progress' ? 'bg-amber-100 border-amber-200 text-amber-800' :
-                                        'bg-indigo-100 border-indigo-200 text-indigo-800'
+                                        'bg-red-100 border-red-200 text-red-800'
                                       }`}
                                       style={{ ...style, top: `${topPos}px` }}
                                       title={`${task.name}: ${task.title || '제목 없음'} (클릭하여 상세 보기)`}
@@ -633,7 +633,7 @@ function Dashboard({ tasks, staff, locations }: { tasks: Task[], staff: Staff[],
             <div className="p-5 border-t border-slate-100 bg-slate-50/50 flex justify-end">
               <button 
                 onClick={() => setSelectedTask(null)} 
-                className="px-5 py-2.5 bg-slate-900 text-white text-sm font-medium rounded-xl hover:bg-slate-800 transition-colors shadow-sm"
+                className="px-5 py-2.5 bg-red-600 text-white text-sm font-medium rounded-xl hover:bg-red-700 transition-colors shadow-sm"
               >
                 닫기
               </button>
@@ -789,7 +789,7 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
                           <select 
                             value={editLocation} 
                             onChange={e => setEditLocation(Number(e.target.value))}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-500"
+                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
                           >
                             {locations.map(loc => (
                               <option key={loc.id} value={loc.id}>{loc.name}</option>
@@ -801,7 +801,7 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
                             type="text" 
                             value={editName}
                             onChange={e => setEditName(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-500"
+                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
                           />
                         </td>
                         <td className="px-4 py-2">
@@ -809,12 +809,12 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
                             type="text" 
                             value={editRole}
                             onChange={e => setEditRole(e.target.value)}
-                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-indigo-500"
+                            className="w-full px-2 py-1 bg-white border border-slate-200 rounded text-sm focus:outline-none focus:border-red-500"
                           />
                         </td>
                         <td className="px-4 py-2 text-right">
                           <div className="flex justify-end gap-2">
-                            <button onClick={saveEdit} className="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="저장">
+                            <button onClick={saveEdit} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="저장">
                               <Save size={16} />
                             </button>
                             <button onClick={() => setEditingId(null)} className="p-1.5 text-slate-400 hover:bg-slate-100 rounded transition-colors" title="취소">
@@ -832,7 +832,7 @@ function StaffManagement({ locations, staff }: { locations: Location[], staff: S
                         <td className="px-4 py-3 text-slate-600">{s.role}</td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => startEdit(s)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded transition-colors" title="수정">
+                            <button onClick={() => startEdit(s)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="수정">
                               <Edit2 size={16} />
                             </button>
                             <button onClick={() => deleteStaff(s.id)} className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="삭제">
@@ -958,7 +958,7 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
               value={newTaskName}
               onChange={(e) => setNewTaskName(e.target.value)}
               placeholder="예: 오픈 준비"
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
             />
           </div>
           <div className="flex-1 space-y-1">
@@ -970,7 +970,7 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
               value={newTaskTitle}
               onChange={(e) => setNewTaskTitle(e.target.value)}
               placeholder="상세 제목 입력..."
-              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+              className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
             />
           </div>
           <div className="flex-1 space-y-1">
@@ -982,14 +982,14 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
                 type="date"
                 value={newTaskStartDate}
                 onChange={(e) => setNewTaskStartDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
               <span className="text-slate-400">-</span>
               <input
                 type="date"
                 value={newTaskEndDate}
                 onChange={(e) => setNewTaskEndDate(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
+                className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all"
               />
             </div>
           </div>
@@ -1003,7 +1003,7 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
             value={newTaskContent}
             onChange={(e) => setNewTaskContent(e.target.value)}
             placeholder="업무 내용 (무제한 입력 가능)..."
-            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all min-h-[80px] resize-y"
+            className="w-full px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-500 transition-all min-h-[80px] resize-y"
           />
         </div>
 
@@ -1011,7 +1011,7 @@ function TaskList({ tasks, staffId }: { tasks: Task[]; staffId: number }) {
           <button
             type="submit"
             disabled={!newTaskName.trim()}
-            className="w-full md:w-auto px-5 py-2 bg-slate-900 text-white text-sm font-medium rounded-lg hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
+            className="w-full md:w-auto px-5 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center justify-center gap-2"
           >
             <Plus size={16} />
             추가
@@ -1148,7 +1148,7 @@ function TaskItem({
               onChange={(e) => setLocalTitle(e.target.value)}
               onBlur={handleBlur}
               placeholder="제목 입력..."
-              className={`flex-1 text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white rounded px-2 py-1 transition-colors ${task.status === "Completed" ? "text-slate-400" : "text-slate-700 font-medium"}`}
+              className={`flex-1 text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors ${task.status === "Completed" ? "text-slate-400" : "text-slate-700 font-medium"}`}
             />
             <div className="flex items-center gap-1 text-sm text-slate-500">
               <input
@@ -1156,7 +1156,7 @@ function TaskItem({
                 value={localStartDate}
                 onChange={(e) => setLocalStartDate(e.target.value)}
                 onBlur={handleBlur}
-                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white rounded px-1 py-1 transition-colors"
+                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
               />
               <span>~</span>
               <input
@@ -1164,7 +1164,7 @@ function TaskItem({
                 value={localEndDate}
                 onChange={(e) => setLocalEndDate(e.target.value)}
                 onBlur={handleBlur}
-                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white rounded px-1 py-1 transition-colors"
+                className="bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-1 py-1 transition-colors"
               />
             </div>
           </div>
@@ -1174,7 +1174,7 @@ function TaskItem({
             onChange={(e) => setLocalContent(e.target.value)}
             onBlur={handleBlur}
             placeholder="업무 내용 (무제한 입력 가능)..."
-            className={`w-full text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-indigo-500 focus:bg-white rounded px-2 py-1 transition-colors min-h-[60px] resize-y ${task.status === "Completed" ? "text-slate-400" : "text-slate-600"}`}
+            className={`w-full text-sm bg-transparent border border-transparent hover:border-slate-200 focus:border-red-500 focus:bg-white rounded px-2 py-1 transition-colors min-h-[60px] resize-y ${task.status === "Completed" ? "text-slate-400" : "text-slate-600"}`}
           />
         </div>
       </div>
