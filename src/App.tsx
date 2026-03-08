@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { io } from "socket.io-client";
+import { app } from "./firebase";
 import { Location, Staff, Task, TaskStatus } from "./types";
 import {
   Building2,
@@ -32,6 +33,28 @@ export default function App() {
   const [view, setView] = useState<'tasks' | 'staff' | 'dashboard'>('dashboard');
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isOnline, setIsOnline] = useState(navigator.onLine && socket.connected);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(socket.connected);
+    const handleOffline = () => setIsOnline(false);
+    
+    const handleSocketConnect = () => setIsOnline(navigator.onLine);
+    const handleSocketDisconnect = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    socket.on('connect', handleSocketConnect);
+    socket.on('disconnect', handleSocketDisconnect);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+      socket.off('connect', handleSocketConnect);
+      socket.off('disconnect', handleSocketDisconnect);
+    };
+  }, []);
 
   useEffect(() => {
     // Fetch initial data
@@ -124,11 +147,19 @@ export default function App() {
         className={`fixed md:static inset-y-0 left-0 z-40 w-64 bg-white border-r border-slate-200 transform transition-transform duration-200 ease-in-out ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0 flex flex-col`}
       >
         <div className="p-6 border-b border-slate-100 mt-10 md:mt-0">
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
-            <Building2 className="text-indigo-600" size={24} />
-            시네마 워크플로우
-          </h1>
-          <p className="text-xs text-slate-500 mt-1">실시간 업무 관리 시스템</p>
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-semibold tracking-tight text-slate-900 flex items-center gap-2">
+              <Building2 className="text-indigo-600" size={24} />
+              시네마 워크플로우
+            </h1>
+          </div>
+          <div className="flex items-center justify-between mt-1">
+            <p className="text-xs text-slate-500">실시간 업무 관리 시스템</p>
+            <div className="flex items-center gap-1.5 bg-slate-50 px-2 py-1 rounded-full border border-slate-100">
+              <div className={`w-2 h-2 rounded-full ${isOnline ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]'}`}></div>
+              <span className="text-[10px] font-medium text-slate-600">{isOnline ? '동기화됨' : '연결 끊김'}</span>
+            </div>
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
